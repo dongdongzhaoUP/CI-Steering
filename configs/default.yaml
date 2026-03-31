@@ -1,0 +1,112 @@
+# CI-Steering Configuration
+# =========================
+# Default settings for the full experimental pipeline.
+# Override via CLI arguments in individual scripts.
+
+# ─── Model ────────────────────────────────────────────────────────
+# Specify one model at a time via --model CLI flag, or set here.
+# All models below are tested and supported.
+model:
+  name: "meta-llama/Llama-3.1-8B-Instruct"
+  dtype: "float16"             # float16 or bfloat16
+  device_map: "auto"
+
+# Supported models (pass any of these to --model):
+#   - meta-llama/Llama-3.1-8B-Instruct   (Llama 3.1, instruct)
+#   - Qwen/Qwen2.5-7B-Instruct           (Qwen 2.5, instruct)
+#   - meta-llama/Llama-2-7b-hf            (Llama 2, base model)
+#   - mistralai/Mistral-7B-Instruct-v0.3  (Mistral, instruct)
+
+# ─── Stimulus Generation ───────────────────────────────────────
+stimulus:
+  num_pairs_per_info_type: 50  # Concept-level pairs per information type
+  num_function_pairs: 200      # Function-level pairs
+  info_types:
+    - health
+    - financial
+    - location
+    - employment
+    - relationships
+    - legal
+    - political
+    - religious
+    - sexual_orientation
+    - substance_use
+
+# ─── Activation Extraction (extract_activations.py) ──────────────
+extraction:
+  token_position: "last"       # "last" or "concept"
+  batch_size: 8
+  layers: "all"                # "all" or list of layer indices
+
+# ─── Representation Reading (read_representations.py) ────────────
+reading:
+  method: "both"               # "pca", "probe", or "both"
+  train_ratio: 0.8
+  pca:
+    n_components: 10
+  probe:
+    max_iter: 1000
+    C: 1.0
+    cv_folds: 5
+
+# ─── Representation Control ───────────────────────────────────────
+control:
+  # Additive steering (Reading Vector)
+  steering:
+    alpha_values: [0.5, 1.0, 2.0, 4.0, 8.0]
+    top_k_layers: 5
+    normalize: true
+    preserve_norm: false
+
+  # Contrast Vector steering
+  contrast:
+    alpha_values: [0.5, 1.0, 2.0]
+    top_k_layers: 10
+    normalize: true
+    preserve_norm: false
+
+  # LoRRA fine-tuning (lorra_finetune.py)
+  lorra:
+    lora_r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    learning_rate: 0.0001
+    num_epochs: 3
+    alpha_lorra: 5.0
+    target_modules: ["q_proj", "v_proj"]
+
+  # Representation Tuning (rep_tuning.py)
+  rep_tuning:
+    lora_r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    learning_rate: 0.0001
+    num_epochs: 3
+    cos_loss_weight: 1.0
+    token_loss_weight: 0.1
+    token_loss_threshold: 0.7
+    target_modules: ["v_proj", "o_proj"]
+
+# ─── Evaluation ───────────────────────────────────────────────────
+evaluation:
+  method: "gpt_judge"          # GPT-4o-mini as judge (only method)
+  gpt_model: "gpt-4o-mini"
+  max_new_tokens: 256
+
+# ─── CI Decomposition (ci_decomposition.py) ──────────────────────
+ci_decomposition:
+  parameters:
+    - info_type
+    - recipient
+    - transmission_principle
+  num_stimuli_per_condition: 100
+
+# ─── External Benchmarks ─────────────────────────────────────────
+benchmarks:
+  confaide_path: "data/confaide"
+  privaci_path: "data/privaci_bench"
+
+# ─── General ──────────────────────────────────────────────────────
+seed: 42
+output_dir: "outputs"
